@@ -56,6 +56,80 @@ Answer:
         return data["choices"][0]["message"]["content"]
     except Exception:
         return str(data)
+    
+
+
+def ask_helpdesk_llm(question, context_sources=None):
+
+    if context_sources is None:
+        context_sources = {}
+
+    moodle_docs = context_sources.get("moodle_docs", "")
+    site_name = context_sources.get("site_name", "")
+
+    system_prompt = f"""
+You are a Moodle Helpdesk AI for the site: {site_name}
+
+Reference documentation:
+{moodle_docs}
+
+Rules:
+1. Only answer Moodle-related questions.
+2. NEVER invent Moodle features.
+3. If unsure or admin-level issue → escalate=true.
+4. If unrelated to Moodle → escalate=true.
+5. Return VALID JSON ONLY.
+
+Return JSON format:
+{{
+  "answer": "...",
+  "confidence": 0-100,
+  "escalate": true/false,
+  "ticket_summary": "...",
+  "priority": "low|medium|high",
+  "category": "technical|account|course|other"
+}}
+
+Question:
+{question}
+"""
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "HTTP-Referer": SITE_URL,
+        "X-Title": SITE_NAME,
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [
+            {"role": "system", "content": "You must return valid JSON only."},
+            {"role": "user", "content": system_prompt},
+        ],
+        "temperature": 0.2
+    }
+
+    response = requests.post(
+        url=OPENROUTER_URL,
+        headers=headers,
+        data=json.dumps(payload),
+    )
+
+    data = response.json()
+
+    try:
+        content = data["choices"][0]["message"]["content"]
+        return json.loads(content)
+    except Exception:
+        return {
+            "answer": "",
+            "confidence": 0,
+            "escalate": True,
+            "ticket_summary": question,
+            "priority": "medium",
+            "category": "technical"
+        }
 
 
 
