@@ -15,7 +15,7 @@ class CurriculumAgent:
             model="gpt-4o-mini",
             temperature=0.5,
             base_url="https://openrouter.ai/api/v1",
-            max_tokens=3000,
+            max_tokens=1000,
             api_key=settings.OPENAI_API_KEY
         ) if settings.OPENAI_API_KEY else None
 
