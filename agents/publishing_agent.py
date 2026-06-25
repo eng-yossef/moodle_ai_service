@@ -36,7 +36,7 @@ class PublishingAgent:
         course_folder = os.path.join(settings.OUTPUT_DIR, course_id)
         os.makedirs(course_folder, exist_ok=True)
         moodle_xml_path = os.path.join(course_folder, f"{course_id}_moodle.xml")
-        with open(moodle_xml_path, "w") as f:
+        with open(moodle_xml_path, "w", encoding="utf-8") as f:
             f.write(moodle_xml_str)
 
         # 4. Create ZIP package
