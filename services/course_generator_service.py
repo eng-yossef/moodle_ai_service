@@ -20,45 +20,40 @@ class CourseGeneratorService:
         self.pub_agent = pub_agent
 
     async def generate_course(self, request_data: Dict[str, Any], file_bytes: bytes, filename: str) -> Dict[str, Any]:
-        # Initialize state
         state = CourseState(
             course_id=request_data.get("course_id", "default"),
             title=request_data.get("title", "Untitled Course"),
             description=request_data.get("description", "")
         )
-        # Step 1: Extract text from document
+        # Step 1: Extract text
         state.raw_text = self.doc_agent.extract_text(file_bytes, filename)
 
-        # Step 2: Generate a logical curriculum (list of lecture topics)
+        # Step 2: Generate curriculum
         num_lectures = request_data.get("num_lectures", 5)
-        curriculum = self.cur_agent.generate_curriculum(
-            state.raw_text,
-            num_lectures,
-            state.title,
-            state.description
+        state.curriculum = self.cur_agent.generate_curriculum(
+            state.raw_text, num_lectures, state.title, state.description
         )
-        state.curriculum = curriculum
 
-        # Step 3: Generate lecture content for each topic using the full text
-        state.lectures = self.lec_agent.generate_lectures(curriculum, state.raw_text, state.title)
+        # Step 3: Generate lectures
+        state.lectures = self.lec_agent.generate_lectures(state.curriculum, state.raw_text, state.title)
 
-        # Step 4: Generate quizzes if requested
-        if request_data.get("include_quizzes", True):
+        # Step 4: Generate quizzes
+        include_quizzes = request_data.get("include_quizzes", True)
+        if include_quizzes:
             state.quizzes = self.ass_agent.generate_quizzes(state.lectures)
 
-        # Step 5: Export to Moodle XML if requested
-        if request_data.get("moodle_export", True):
-            state.moodle_xml = self.pub_agent.export_moodle(state.title, state.lectures, state.quizzes)
-
-        # Step 6: Generate PDF course material
-        include_quizzes = request_data.get("include_quizzes", True)
-        pdf_path = self.pub_agent.export_pdf(
-            state.title, 
-            state.lectures, 
-            include_quizzes, 
-            state.quizzes if include_quizzes else None
+        # Step 5: Export all artifacts (PDFs + Moodle XML + ZIP)
+        export_result = self.pub_agent.export_pdf(
+            state.course_id,
+            state.title,
+            state.lectures,
+            include_quizzes,
+            state.quizzes
         )
-        state.pdf_path = pdf_path
+        state.pdf_path = export_result["course_pdf"]
+        state.lecture_pdf_paths = export_result["lecture_pdfs"]
+        state.moodle_xml = export_result["moodle_xml"]
+        state.zip_path = export_result["zip_path"]
 
         state.completed = True
         return state.dict()

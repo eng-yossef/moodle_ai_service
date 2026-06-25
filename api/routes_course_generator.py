@@ -21,6 +21,7 @@ from models.response_models import (
     CourseGenerationResponse,
     LectureSummary
 )
+from core.config import settings
 
 router = APIRouter(
     prefix="/course",
@@ -38,7 +39,7 @@ async def generate_course(
     description: Optional[str] = Form(None),
     num_lectures: int = Form(5, ge=1, le=20),
     include_quizzes: bool = Form(True),
-    moodle_export: bool = Form(True),
+    moodle_export: bool = Form(True),  # currently always true for XML
     service: CourseGeneratorService = Depends(
         get_course_generator_service
     )
@@ -89,105 +90,64 @@ async def generate_course(
     lectures_summary = []
 
     for lec in result.get("lectures", []):
-
         lectures_summary.append(
             LectureSummary(
                 id=lec.get("id", ""),
                 title=lec.get("title", ""),
                 order=lec.get("order", 0),
-                summary=lec.get(
-                    "content",
-                    ""
-                )[:200]
+                summary=lec.get("content", "")[:200]
             )
         )
 
-    output_dir = Path("outputs")
-    output_dir.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-
-    moodle_url = None
-    pdf_url = None
+    # --------------------------------------------------
+    # Helper: build download URL if file exists
+    # --------------------------------------------------
+    def get_download_url(filepath: str) -> Optional[str]:
+        if filepath and os.path.exists(filepath):
+            return f"/course/download/{os.path.basename(filepath)}"
+        return None
 
     # --------------------------------------------------
     # Moodle XML
     # --------------------------------------------------
-
+    moodle_url = None
     if result.get("moodle_xml"):
-
-        xml_content = result["moodle_xml"]
-
-        xml_filename = (
+        xml_path = os.path.join(
+            settings.OUTPUT_DIR,
+            course_id,
             f"{course_id}_moodle.xml"
         )
-
-        xml_path = (
-            output_dir /
-            xml_filename
-        )
-
-        with open(
-            xml_path,
-            "w",
-            encoding="utf-8"
-        ) as f:
-            f.write(xml_content)
-
-        moodle_url = (
-            f"/course/download/"
-            f"{xml_filename}"
-        )
+        if os.path.exists(xml_path):
+            moodle_url = f"/course/download/{os.path.basename(xml_path)}"
 
     # --------------------------------------------------
-    # PDF
+    # PDF (full course)
     # --------------------------------------------------
+    pdf_url = get_download_url(result.get("pdf_path"))
 
-    pdf_path = result.get("pdf_path")
+    # --------------------------------------------------
+    # Lecture PDFs
+    # --------------------------------------------------
+    lecture_pdf_urls = []
+    for path in result.get("lecture_pdf_paths", []):
+        url = get_download_url(path)
+        if url:
+            lecture_pdf_urls.append(url)
 
-    print(
-        f"Generated PDF Path: "
-        f"{pdf_path}"
-    )
-
-    if pdf_path:
-
-        pdf_file = Path(pdf_path)
-
-        if pdf_file.exists():
-
-            pdf_url = (
-                f"/course/download/"
-                f"{pdf_file.name}"
-            )
-
-            print(
-                f"PDF URL: {pdf_url}"
-            )
-
-        else:
-
-            print(
-                f"PDF not found: "
-                f"{pdf_file}"
-            )
+    # --------------------------------------------------
+    # ZIP archive
+    # --------------------------------------------------
+    zip_url = get_download_url(result.get("zip_path"))
 
     return CourseGenerationResponse(
         course_id=course_id,
-        title=result.get(
-            "title",
-            title
-        ),
+        title=result.get("title", title),
         lectures=lectures_summary,
-        total_quizzes=len(
-            result.get(
-                "quizzes",
-                []
-            )
-        ),
+        total_quizzes=len(result.get("quizzes", [])),
         moodle_export_url=moodle_url,
         pdf_url=pdf_url,
+        lecture_pdf_urls=lecture_pdf_urls,
+        zip_url=zip_url,
         created_at=datetime.utcnow()
     )
 
@@ -199,6 +159,7 @@ async def download_file(
     filename: str
 ):
 
+    # Security: prevent directory traversal
     if (
         ".." in filename
         or "/" in filename
@@ -209,18 +170,15 @@ async def download_file(
             detail="Invalid filename"
         )
 
-    filepath = (
-        Path("outputs")
-        / filename
-    )
+    # Search in output directory and its subdirectories
+    for root, dirs, files in os.walk(settings.OUTPUT_DIR):
+        if filename in files:
+            return FileResponse(
+                os.path.join(root, filename),
+                filename=filename
+            )
 
-    if not filepath.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="File not found"
-        )
-
-    return FileResponse(
-        path=str(filepath),
-        filename=filename
+    raise HTTPException(
+        status_code=404,
+        detail="File not found"
     )
