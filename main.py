@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from api import routes_course_generator
 from core.cors import add_cors
 from api.routes_ask import router as ask_router
 from api.routes_similarity import router as similarity_router
@@ -16,6 +17,7 @@ app.include_router(similarity_router)
 app.include_router(helpdesk_router)
 app.include_router(jobs_router)
 app.include_router(interview_router)
+app.include_router(routes_course_generator.router)
 
 
 @app.on_event("startup")
