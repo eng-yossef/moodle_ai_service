@@ -10,11 +10,11 @@ Fixes vs original:
 """
 
 import json
+from fastmcp import settings
 from langchain_openai import ChatOpenAI
 from langchain.messages import HumanMessage, AIMessage, SystemMessage
 
 from core.config import (
-    OPENROUTER_API_KEY,
     OPENROUTER_URL,
     MODEL_NAME,
     SITE_URL,
@@ -32,9 +32,9 @@ def _get_chat_model(temperature: float = 0.7) -> ChatOpenAI:
             model="gpt-4o-mini",
             temperature=0.5,
             base_url="https://openrouter.ai/api/v1",
-            max_tokens=500,
-            api_key=OPENROUTER_API_KEY
-        ) if OPENROUTER_API_KEY else None
+            max_tokens=400,
+            api_key=settings.OPENROUTER_API_KEY
+        ) if settings.OPENROUTER_API_KEY else None
 
 
 def _chat(messages: list[dict], temperature: float = 0.7) -> str:

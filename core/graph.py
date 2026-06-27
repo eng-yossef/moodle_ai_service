@@ -5,6 +5,7 @@ from langgraph.types import interrupt
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage
 from .models import InterviewState
+from core.config import settings
 import json
 
 MAX_QUESTIONS = 5
@@ -14,7 +15,7 @@ llm = ChatOpenAI(
     temperature=0.5,
     base_url="https://openrouter.ai/api/v1",
     max_tokens=1000,
-    api_key="REMOVED_OPENROUTER_KEY"
+    api_key=settings.OPENROUTER_API_KEY
 )
 
 # ---------- Node 1 ----------

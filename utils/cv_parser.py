@@ -33,7 +33,7 @@ JSON output:"""
     temperature=0,
     base_url="https://openrouter.ai/api/v1",
     max_tokens=1000,
-    api_key="REMOVED_OPENROUTER_KEY"
+    api_key=settings.OPENROUTER_API_KEY
 )
 
     chain = prompt | llm
